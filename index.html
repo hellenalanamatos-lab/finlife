@@ -1,0 +1,1138 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="referrer" content="no-referrer">
+<title>FinLife — Seu dinheiro, organizado</title>
+<style>
+  :root{
+    --brand:#1F6F5C; --brand-dk:#134A3C; --brand-lt:#EAF3F0; --accent:#0E7C86;
+    --ink:#1c2529; --muted:#6b7580; --line:#e6ebe9; --bg:#f4f6f5; --card:#ffffff;
+    --pos:#1F8A5B; --neg:#D0453B; --warn:#B7791F; --shadow:0 4px 20px rgba(20,60,45,.08);
+    --radius:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:#dfe4e2;color:var(--ink);
+    display:flex;justify-content:center;align-items:stretch;
+  }
+  /* moldura tipo celular no desktop; tela cheia no mobile */
+  #app{
+    width:100%;max-width:430px;background:var(--bg);min-height:100vh;
+    display:flex;flex-direction:column;position:relative;box-shadow:0 0 40px rgba(0,0,0,.15);
+    overflow:hidden;
+  }
+  header.topbar{
+    background:linear-gradient(160deg,var(--brand),var(--brand-dk));color:#fff;
+    padding:18px 20px 20px;position:sticky;top:0;z-index:5;
+  }
+  .topbar .row{display:flex;align-items:center;justify-content:space-between}
+  .brand{font-weight:800;font-size:22px;letter-spacing:-.5px;display:flex;align-items:center;gap:7px}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:#8fe3c4;display:inline-block}
+  .topbar .hello{opacity:.85;font-size:13px;margin-top:2px}
+  .balance-card{margin-top:16px}
+  .balance-card .lbl{font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.6px}
+  .balance-card .val{font-size:32px;font-weight:800;margin-top:2px}
+  .balance-card .sub{font-size:12px;opacity:.85;margin-top:4px;display:flex;gap:14px}
+  .balance-card .sub b{font-weight:700}
+  .eye{background:rgba(255,255,255,.15);border:0;color:#fff;border-radius:9px;width:34px;height:34px;font-size:15px;cursor:pointer}
+
+  main{flex:1;overflow-y:auto;padding:16px 16px 96px}
+  .view{display:none;animation:fade .25s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  h2.section{font-size:15px;margin:20px 2px 10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  h2.section:first-child{margin-top:4px}
+
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:12px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .stat{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px}
+  .stat .t{font-size:12px;color:var(--muted);font-weight:600}
+  .stat .v{font-size:20px;font-weight:800;margin-top:4px}
+  .stat .v.pos{color:var(--pos)} .stat .v.neg{color:var(--neg)}
+
+  .list-item{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line)}
+  .list-item:last-child{border-bottom:0}
+  .ic{width:42px;height:42px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--brand-lt)}
+  .li-main{flex:1;min-width:0}
+  .li-title{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .li-sub{font-size:12px;color:var(--muted);margin-top:1px}
+  .li-amt{font-weight:700;font-size:15px;white-space:nowrap}
+  .amt-pos{color:var(--pos)} .amt-neg{color:var(--ink)}
+
+  .empty{text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
+  .empty .big{font-size:34px;margin-bottom:6px}
+
+  .catbar{height:8px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:6px}
+  .catbar > span{display:block;height:100%}
+  .catrow{display:flex;justify-content:space-between;font-size:13px;margin-top:12px}
+  .catrow .nm{display:flex;align-items:center;gap:8px}
+  .swatch{width:12px;height:12px;border-radius:4px;display:inline-block}
+
+  .insight{display:flex;gap:10px;align-items:flex-start;background:var(--brand-lt);border-radius:12px;padding:12px;margin-bottom:8px}
+  .insight .em{font-size:18px}
+  .insight .tx{font-size:13.5px;line-height:1.45}
+
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--brand-lt);color:var(--brand)}
+
+  /* chips de conta/cartao */
+  .chip-row{display:flex;gap:10px;overflow-x:auto;padding:2px 0 6px;margin-bottom:4px}
+  .acct-chip{flex:none;min-width:150px;border-radius:14px;padding:14px;color:#fff;box-shadow:var(--shadow)}
+  .acct-chip .nm{font-size:13px;opacity:.9}
+  .acct-chip .bl{font-size:19px;font-weight:800;margin-top:6px}
+  .acct-chip .tp{font-size:11px;opacity:.8;margin-top:2px;text-transform:capitalize}
+
+  .cardface{border-radius:16px;padding:16px;color:#fff;box-shadow:var(--shadow);margin-bottom:12px;position:relative;overflow:hidden}
+  .cardface::after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.08)}
+  .cardface .nm{font-size:14px;font-weight:700;opacity:.95}
+  .cardface .fat{font-size:24px;font-weight:800;margin-top:10px}
+  .cardface .meta{display:flex;justify-content:space-between;font-size:11px;opacity:.9;margin-top:12px}
+  .progress{height:6px;background:rgba(255,255,255,.25);border-radius:6px;margin-top:8px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:#fff}
+
+  /* botoes */
+  .btn{border:0;border-radius:12px;padding:13px 16px;font-size:15px;font-weight:700;cursor:pointer;width:100%}
+  .btn.primary{background:var(--brand);color:#fff}
+  .btn.primary:active{background:var(--brand-dk)}
+  .btn.ghost{background:var(--brand-lt);color:var(--brand)}
+  .btn.mini{width:auto;padding:8px 14px;font-size:13px;border-radius:10px}
+  .btn.danger{background:#fbeae8;color:var(--neg)}
+
+  /* nav inferior */
+  nav.tabbar{
+    position:absolute;bottom:0;left:0;right:0;height:72px;background:#fff;border-top:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-around;padding-bottom:env(safe-area-inset-bottom);z-index:6;
+  }
+  .tab{background:0;border:0;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11px;cursor:pointer;flex:1;padding:6px 0}
+  .tab .ti{font-size:20px;line-height:1}
+  .tab.active{color:var(--brand)}
+  .fab{width:56px;height:56px;border-radius:50%;background:var(--brand);color:#fff;border:0;font-size:30px;line-height:1;
+    box-shadow:0 6px 16px rgba(31,111,92,.45);cursor:pointer;margin-top:-24px;flex:none}
+  .fab:active{background:var(--brand-dk)}
+
+  /* modal */
+  .sheet-bg{position:absolute;inset:0;background:rgba(15,30,25,.45);z-index:20;display:none;align-items:flex-end}
+  .sheet-bg.open{display:flex}
+  .sheet{background:#fff;width:100%;border-radius:22px 22px 0 0;padding:18px 18px 26px;max-height:92%;overflow-y:auto;animation:up .28s ease}
+  @keyframes up{from{transform:translateY(100%)}to{transform:none}}
+  .sheet h3{margin:2px 0 14px;font-size:19px}
+  .grabber{width:44px;height:5px;background:var(--line);border-radius:5px;margin:0 auto 14px}
+  label.fld{display:block;font-size:12.5px;color:var(--muted);font-weight:600;margin:12px 2px 5px}
+  input,select{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:15px;font-family:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:0;border-color:var(--brand)}
+  .seg{display:flex;background:var(--brand-lt);border-radius:12px;padding:4px;gap:4px}
+  .seg button{flex:1;border:0;background:0;padding:10px;border-radius:9px;font-weight:700;font-size:14px;color:var(--muted);cursor:pointer}
+  .seg button.on{background:#fff;color:var(--brand);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .catgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px}
+  .catpick{border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:9px 4px;text-align:center;cursor:pointer;font-size:11px;color:var(--muted)}
+  .catpick .e{font-size:20px;display:block}
+  .catpick.on{border-color:var(--brand);background:var(--brand-lt);color:var(--brand);font-weight:700}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:5px}
+
+  /* assistente */
+  .chatlog{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+  .bubble{max-width:85%;padding:11px 14px;border-radius:16px;font-size:14px;line-height:1.45}
+  .bubble.user{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:5px}
+  .bubble.bot{align-self:flex-start;background:#fff;box-shadow:var(--shadow);border-bottom-left-radius:5px}
+  .suggest{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .suggest button{border:1px solid var(--line);background:#fff;border-radius:20px;padding:8px 12px;font-size:12.5px;cursor:pointer;color:var(--brand)}
+  .chatform{display:flex;gap:8px}
+  .chatform input{flex:1}
+  .chatform button{flex:none;width:48px;border-radius:12px;background:var(--brand);color:#fff;border:0;font-size:18px;cursor:pointer}
+
+  .more-item{display:flex;align-items:center;gap:12px;padding:15px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+  .more-item .ic{background:var(--brand-lt)}
+  .toast{position:absolute;bottom:88px;left:50%;transform:translateX(-50%);background:var(--brand-dk);color:#fff;padding:11px 18px;border-radius:12px;font-size:13.5px;font-weight:600;z-index:30;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
+  .toast.show{opacity:1;bottom:98px}
+  .del-x{background:0;border:0;color:var(--muted);font-size:16px;cursor:pointer;padding:6px}
+
+  /* tela de bloqueio */
+  #lockScreen{display:none;position:fixed;inset:0;z-index:100;
+    background:linear-gradient(165deg,var(--brand),var(--brand-dk));
+    align-items:center;justify-content:center;padding:24px}
+  .lockbox{background:#fff;border-radius:20px;padding:30px 24px;width:100%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .lock-ic{font-size:44px}
+  .lock-title{font-size:22px;font-weight:800;margin-top:8px;color:var(--ink)}
+  .lock-sub{font-size:13.5px;color:var(--muted);margin:6px 0 18px}
+  #lockPass{width:100%;padding:14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;text-align:center}
+  #lockPass:focus{outline:0;border-color:var(--brand)}
+  .lock-err{color:var(--neg);font-size:13px;min-height:18px;margin:8px 0}
+  .lockbox .btn{margin-top:4px}
+
+  /* sidebar e desktop: ocultos por padrão (mobile-first) */
+  .sidebar{display:none}
+  .bcleft{display:block}
+  .content{display:flex;flex-direction:column;flex:1;min-height:100vh;position:relative}
+
+  /* ====================== DESKTOP ====================== */
+  @media(min-width:900px){
+    body{align-items:flex-start;background:#d3dad7;overflow:hidden}
+    #app{max-width:none;width:100%;flex-direction:row;margin:0;height:100vh;overflow:hidden}
+    .content{height:100vh;overflow:hidden}
+    main{padding:26px 36px 48px}
+    nav.tabbar{display:none}
+
+    .sidebar{display:flex;flex-direction:column;width:242px;flex:none;
+      background:linear-gradient(185deg,var(--brand-dk),#0d3a2e);color:#fff;padding:24px 16px 18px;position:sticky;top:0;height:100vh}
+    .side-brand{font-weight:800;font-size:25px;display:flex;align-items:center;gap:9px;padding:4px 10px 20px}
+    .side-brand .dot{width:11px;height:11px;border-radius:50%;background:#8fe3c4;display:inline-block}
+    .side-nav{display:flex;flex-direction:column;gap:4px}
+    .side-nav .tab{flex:none;flex-direction:row;justify-content:flex-start;gap:13px;color:#cfe3db;font-size:15px;font-weight:600;
+      padding:12px 14px;border-radius:11px;width:100%;text-align:left;transition:.15s}
+    .side-nav .tab .ti{font-size:19px}
+    .side-nav .tab:hover{background:rgba(255,255,255,.09);color:#fff}
+    .side-nav .tab.active{background:rgba(255,255,255,.17);color:#fff}
+    .side-add{margin-top:16px;background:#fff;color:var(--brand-dk);border:0;border-radius:12px;padding:13px;font-weight:800;font-size:15px;cursor:pointer;transition:.15s}
+    .side-add:hover{background:#eafaf3}
+    .side-foot{margin-top:auto;font-size:11px;opacity:.55;padding:12px 8px 4px;text-align:center;line-height:1.5}
+
+    /* topbar vira faixa horizontal */
+    header.topbar{padding:20px 36px}
+    .topbar .brand{display:none}
+    .topbar .row{position:absolute;top:20px;right:36px;width:auto}
+    .topbar .hello{font-size:14px}
+    .topbar .balance-card{margin-top:2px;display:flex;align-items:flex-end;justify-content:space-between;gap:30px}
+    .topbar .bcleft{display:block}
+    .topbar .balance-card .val{font-size:30px}
+    .topbar .balance-card .sub{margin-top:0;font-size:13.5px}
+
+    /* dashboard em 2 colunas — ocupa toda a largura disponível */
+    #v-home .dash{display:grid;grid-template-columns:1.05fr .95fr;gap:24px;align-items:start}
+    #v-home .dash .col{min-width:0}
+    #v-home h2.section:first-child{margin-top:0}
+
+    /* listas/telas: largura confortável, mas usando o espaço da tela */
+    #v-tx,#v-cards,#v-more,#v-chat{max-width:960px;margin:0 auto;width:100%}
+    #v-cards .cardface{max-width:520px}
+
+    /* modal centralizado como diálogo */
+    .sheet-bg{align-items:center;justify-content:center}
+    .sheet{max-width:470px;border-radius:20px;max-height:88vh;animation:pop .2s ease}
+    @keyframes pop{from{transform:scale(.96);opacity:.5}to{transform:none;opacity:1}}
+
+    main::-webkit-scrollbar{width:10px}
+    main::-webkit-scrollbar-thumb{background:#c4d0cb;border-radius:8px}
+  }
+
+  /* telas muito largas: em 3 colunas quando há espaço de sobra */
+  @media(min-width:1500px){
+    #v-home .dash{grid-template-columns:1fr 1fr;gap:28px}
+    main{padding:30px 48px 54px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar">
+    <div class="side-brand"><span class="dot"></span>FinLife</div>
+    <nav class="side-nav">
+      <button class="tab active" data-tab="home"><span class="ti">🏠</span><span>Início</span></button>
+      <button class="tab" data-tab="tx"><span class="ti">📄</span><span>Transações</span></button>
+      <button class="tab" data-tab="cards"><span class="ti">💳</span><span>Cartões</span></button>
+      <button class="tab" data-tab="chat"><span class="ti">🤖</span><span>Assistente</span></button>
+      <button class="tab" data-tab="more"><span class="ti">⋯</span><span>Mais</span></button>
+    </nav>
+    <button class="side-add" onclick="openTxSheet()">＋ Nova transação</button>
+    <div class="side-foot">Protótipo web · dados salvos neste navegador</div>
+  </aside>
+
+  <div class="content">
+  <header class="topbar">
+    <div class="row">
+      <div>
+        <div class="brand"><span class="dot"></span>FinLife</div>
+        <div class="hello" id="hello">Olá! 👋</div>
+      </div>
+      <button class="eye" id="eyeBtn" title="Mostrar/ocultar valores">👁</button>
+    </div>
+    <div class="balance-card">
+      <div class="bcleft">
+        <div class="lbl">Saldo consolidado</div>
+        <div class="val" id="totalBal">R$ 0,00</div>
+      </div>
+      <div class="sub">
+        <span>Entradas: <b id="mIn">R$ 0</b></span>
+        <span>Saídas: <b id="mOut">R$ 0</b></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- INÍCIO -->
+    <section class="view active" id="v-home"></section>
+    <!-- TRANSAÇÕES -->
+    <section class="view" id="v-tx"></section>
+    <!-- CARTÕES -->
+    <section class="view" id="v-cards"></section>
+    <!-- MAIS -->
+    <section class="view" id="v-more"></section>
+    <!-- ASSISTENTE -->
+    <section class="view" id="v-chat"></section>
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab active" data-tab="home"><span class="ti">🏠</span>Início</button>
+    <button class="tab" data-tab="tx"><span class="ti">📄</span>Transações</button>
+    <button class="fab" id="fab">+</button>
+    <button class="tab" data-tab="cards"><span class="ti">💳</span>Cartões</button>
+    <button class="tab" data-tab="more"><span class="ti">⋯</span>Mais</button>
+  </nav>
+  </div>
+
+  <div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<div id="lockScreen">
+  <div class="lockbox">
+    <div class="lock-ic">🔒</div>
+    <div class="lock-title">FinLife bloqueado</div>
+    <div class="lock-sub">Digite sua senha para acessar seus dados.</div>
+    <input id="lockPass" type="password" placeholder="Senha" autocomplete="current-password">
+    <div id="lockErr" class="lock-err"></div>
+    <button id="lockBtn" class="btn primary">Desbloquear</button>
+  </div>
+</div>
+
+<script>
+/* ====================== ESTADO ====================== */
+const LS_KEY = "finly_v2";
+const CATS = {
+  alimentacao:{nome:"Alimentação",e:"🍔",cor:"#E8663D",kw:["mercado","supermercado","ifood","restaurante","lanche","padaria","comida","pizza","hamburg","cafe","açougue","hortifruti"]},
+  transporte:{nome:"Transporte",e:"🚗",cor:"#3E6FB0",kw:["uber","99","gasolina","combustivel","combustível","onibus","ônibus","metro","metrô","posto","estacionamento","pedagio"]},
+  moradia:{nome:"Moradia",e:"🏠",cor:"#7C5CBF",kw:["aluguel","luz","agua","água","condominio","condomínio","internet","energia","gas","gás","iptu"]},
+  saude:{nome:"Saúde",e:"💊",cor:"#2AA79B",kw:["farmacia","farmácia","medico","médico","plano","hospital","dentista","academia","exame","remedio","remédio"]},
+  lazer:{nome:"Lazer",e:"🎮",cor:"#D6467F",kw:["cinema","netflix","spotify","jogo","bar","show","viagem","hotel","disney","prime","hbo","balada"]},
+  compras:{nome:"Compras",e:"🛍️",cor:"#C9962B",kw:["loja","roupa","amazon","shopping","magalu","mercadolivre","calcado","calçado","eletronico","eletrônico","presente"]},
+  educacao:{nome:"Educação",e:"📚",cor:"#4C8C4A",kw:["curso","escola","faculdade","livro","udemy","alura","mensalidade"]},
+  salario:{nome:"Salário / Renda",e:"💰",cor:"#1F8A5B",kw:["salario","salário","pagamento","freela","freelance","rendimento","pix recebido","deposito","depósito","transferencia recebida"],receita:true},
+  outros:{nome:"Outros",e:"📦",cor:"#6b7580",kw:[]}
+};
+const ACCENT_COLORS = ["#1F6F5C","#0E7C86","#3E6FB0","#7C5CBF","#C9962B","#D6467F","#E8663D"];
+
+let S = emptyState();     // preenchido por init()
+let hideValues = false;
+
+/* ---- Segurança: criptografia local opcional (Web Crypto / AES-GCM) ---- */
+const SUB = (window.crypto && crypto.subtle) ? crypto.subtle : null;
+let cryptoKey = null;     // chave AES em memória durante a sessão
+let encSalt = null;       // salt (Uint8Array), guardado no envelope
+let encEnabled = false;   // true quando os dados estão criptografados
+
+function emptyState(){ return {nome:"",accounts:[],cards:[],tx:[],recur:[]}; }
+function abToB64(buf){ const b=new Uint8Array(buf); let s=""; for(let i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s); }
+function b64ToU8(str){ const s=atob(str); const u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; }
+async function deriveKey(pass, salt){
+  const base = await SUB.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  return SUB.deriveKey({name:"PBKDF2", salt, iterations:150000, hash:"SHA-256"}, base,
+    {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]);
+}
+async function encryptEnvelope(){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await SUB.encrypt({name:"AES-GCM", iv}, cryptoKey, new TextEncoder().encode(JSON.stringify(S)));
+  return {__enc:1, salt:abToB64(encSalt), iv:abToB64(iv), ct:abToB64(ct)};
+}
+async function decryptEnvelope(env, key){
+  const pt = await SUB.decrypt({name:"AES-GCM", iv:b64ToU8(env.iv)}, key, b64ToU8(env.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+function save(){
+  if(encEnabled && cryptoKey && SUB){
+    encryptEnvelope().then(env=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(env)); }catch(e){} }).catch(()=>{});
+  } else {
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){}
+  }
+}
+function afterUnlock(){ materializeRecurrences(); renderAll(); }
+async function init(){
+  let raw=null; try{ raw=localStorage.getItem(LS_KEY); }catch(e){}
+  if(!raw){ S=emptyState(); afterUnlock(); return; }
+  let parsed; try{ parsed=JSON.parse(raw); }catch(e){ S=emptyState(); afterUnlock(); return; }
+  if(parsed && parsed.__enc){
+    encEnabled=true; encSalt=b64ToU8(parsed.salt);
+    showLock(parsed);
+  } else {
+    if(!parsed.recur) parsed.recur=[];
+    S=parsed; encEnabled=false; afterUnlock();
+  }
+}
+function showLock(env){
+  const ov=document.getElementById("lockScreen"); ov.style.display="flex";
+  const err=document.getElementById("lockErr"); err.textContent="";
+  const pass=document.getElementById("lockPass"); pass.value="";
+  const doUnlock=async()=>{
+    if(!pass.value) return;
+    err.style.color="var(--muted)"; err.textContent="Verificando...";
+    try{
+      const key=await deriveKey(pass.value, encSalt);
+      const data=await decryptEnvelope(env, key);
+      if(!data.recur) data.recur=[];
+      S=data; cryptoKey=key; err.textContent="";
+      ov.style.display="none";
+      afterUnlock();
+    }catch(e){ err.style.color="var(--neg)"; err.textContent="Senha incorreta. Tente novamente."; pass.select(); }
+  };
+  document.getElementById("lockBtn").onclick=doUnlock;
+  pass.onkeydown=e=>{ if(e.key==="Enter") doUnlock(); };
+  setTimeout(()=>pass.focus(),150);
+}
+function seed(){
+  const today = new Date();
+  const iso = d => d.toISOString().slice(0,10);
+  const dAgo = n => { const x=new Date(); x.setDate(x.getDate()-n); return iso(x); };
+  const ym = (new Date()).toISOString().slice(0,7);
+  const st = {
+    nome:"",
+    accounts:[
+      {id:"a1",nome:"Conta Corrente",tipo:"corrente",saldoInicial:3200,cor:"#1F6F5C"},
+      {id:"a2",nome:"Carteira",tipo:"carteira",saldoInicial:180,cor:"#0E7C86"},
+      {id:"a3",nome:"Poupança",tipo:"poupanca",saldoInicial:8500,cor:"#3E6FB0"}
+    ],
+    cards:[
+      {id:"c1",nome:"Nubank",limite:4000,fechamento:28,vencimento:5,cor:"#7C5CBF"},
+      {id:"c2",nome:"Itaú Visa",limite:6000,fechamento:20,vencimento:1,cor:"#E8663D"}
+    ],
+    tx:[
+      {id:txid(),tipo:"receita",valor:5200,desc:"Salário",cat:"salario",src:"a1",date:dAgo(6),comp:ym},
+      {id:txid(),tipo:"despesa",valor:1500,desc:"Aluguel",cat:"moradia",src:"a1",date:dAgo(5),comp:ym},
+      {id:txid(),tipo:"despesa",valor:230.9,desc:"Supermercado Extra",cat:"alimentacao",src:"a1",date:dAgo(4),comp:ym},
+      {id:txid(),tipo:"despesa",valor:39.9,desc:"Netflix",cat:"lazer",src:"c1",date:dAgo(4),comp:ym,parcAtual:1,parcTotal:1},
+      {id:txid(),tipo:"despesa",valor:64.5,desc:"Uber",cat:"transporte",src:"a2",date:dAgo(3),comp:ym},
+      {id:txid(),tipo:"despesa",valor:120,desc:"Farmácia São João",cat:"saude",src:"c1",date:dAgo(2),comp:ym,parcAtual:1,parcTotal:1},
+      {id:txid(),tipo:"despesa",valor:89.9,desc:"iFood",cat:"alimentacao",src:"c1",date:dAgo(1),comp:ym,parcAtual:1,parcTotal:1},
+      {id:txid(),tipo:"despesa",valor:350,desc:"Tênis (parcela)",cat:"compras",src:"c2",date:dAgo(1),comp:ym,parcAtual:1,parcTotal:3},
+    ],
+    recur:[]
+  };
+  return st;
+}
+function txid(){ return "t"+Math.random().toString(36).slice(2,9); }
+
+/* ====================== RECORRÊNCIAS ====================== */
+function addPeriod(iso, per){
+  const d=new Date(iso+"T00:00:00");
+  if(per==="mensal") d.setMonth(d.getMonth()+1);
+  else if(per==="semanal") d.setDate(d.getDate()+7);
+  else if(per==="anual") d.setFullYear(d.getFullYear()+1);
+  return d.toISOString().slice(0,10);
+}
+function perLabel(per){ return {mensal:"mensal",semanal:"semanal",anual:"anual"}[per]||per; }
+// gera as ocorrências vencidas (do início até hoje) de cada recorrência ativa
+function materializeRecurrences(){
+  const today=new Date().toISOString().slice(0,10);
+  let changed=false;
+  (S.recur||[]).forEach(r=>{
+    if(!r.ativo) return;
+    let next = r.lastRun ? addPeriod(r.lastRun, r.periodicidade) : r.startDate;
+    let guard=0;
+    while(next<=today && guard<1000){
+      S.tx.push({id:txid(),tipo:r.tipo,valor:r.valor,desc:r.desc,cat:r.cat,src:r.src,
+        date:next,comp:next.slice(0,7),recId:r.id,recPer:r.periodicidade});
+      r.lastRun=next; changed=true;
+      next=addPeriod(next, r.periodicidade); guard++;
+    }
+  });
+  if(changed) save();
+}
+
+/* ====================== HELPERS ====================== */
+const fmt = v => hideValues ? "•••••" : (v<0?"-":"")+"R$ "+Math.abs(v).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtShort = v => hideValues ? "•••" : "R$ "+Math.abs(v).toLocaleString("pt-BR",{maximumFractionDigits:0});
+const curYM = () => new Date().toISOString().slice(0,7);
+const esc = s => (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+// interpreta valor no formato brasileiro: "17,50" -> 17.5 ; "1.750,00" -> 1750 ; "1750" -> 1750
+function parseMoney(str){
+  if(str==null) return NaN;
+  str=(""+str).trim().replace(/[^\d.,-]/g,"");
+  if(str.indexOf(",")>-1){ str=str.replace(/\./g,"").replace(",","."); }
+  return parseFloat(str);
+}
+function autoCat(desc,tipo){
+  const d=(desc||"").toLowerCase();
+  for(const k in CATS){ if(CATS[k].kw.some(w=>d.includes(w))) return k; }
+  return tipo==="receita"?"salario":"outros";
+}
+function accountBalance(accId){
+  const acc = S.accounts.find(a=>a.id===accId); if(!acc) return 0;
+  let bal = acc.saldoInicial;
+  S.tx.forEach(t=>{
+    if(t.src!==accId) return;
+    if(t.tipo==="receita") bal+=t.valor;
+    else if(t.tipo==="despesa") bal-=t.valor;
+    else if(t.tipo==="transf-out") bal-=t.valor;
+    else if(t.tipo==="transf-in") bal+=t.valor;
+  });
+  return bal;
+}
+const isCard = id => S.cards.some(c=>c.id===id);
+function totalBalance(){ return S.accounts.reduce((s,a)=>s+accountBalance(a.id),0); }
+function monthTx(ym){ return S.tx.filter(t=>(t.comp||t.date.slice(0,7))===ym); }
+function monthIncome(ym){ return monthTx(ym).filter(t=>t.tipo==="receita").reduce((s,t)=>s+t.valor,0); }
+function monthExpense(ym){ return monthTx(ym).filter(t=>t.tipo==="despesa").reduce((s,t)=>s+t.valor,0); }
+function cardInvoice(cardId,ym){
+  return S.tx.filter(t=>t.src===cardId && (t.comp||t.date.slice(0,7))===ym && t.tipo==="despesa").reduce((s,t)=>s+t.valor,0);
+}
+function srcName(id){ const a=S.accounts.find(a=>a.id===id); if(a)return esc(a.nome); const c=S.cards.find(c=>c.id===id); return c?esc(c.nome):"—"; }
+
+/* ====================== RENDER ====================== */
+function renderAll(){ renderTop(); renderHome(); renderTx(); renderCards(); renderMore(); save(); }
+
+function renderTop(){
+  document.getElementById("hello").textContent = S.nome ? `Olá, ${S.nome}! 👋` : "Bem-vinda ao seu FinLife 👋";
+  document.getElementById("totalBal").textContent = fmt(totalBalance());
+  document.getElementById("mIn").textContent = fmtShort(monthIncome(curYM()));
+  document.getElementById("mOut").textContent = fmtShort(monthExpense(curYM()));
+}
+
+function renderHome(){
+  const ym=curYM(), inc=monthIncome(ym), out=monthExpense(ym), saldoMes=inc-out;
+  // tela de boas-vindas quando vazio
+  if(S.accounts.length===0 && S.tx.length===0){
+    document.getElementById("v-home").innerHTML=`
+    <div class="card" style="text-align:center;padding:30px 20px;margin-top:20px">
+      <div style="font-size:46px">👋</div>
+      <h3 style="margin:10px 0 4px">Bem-vinda ao FinLife!</h3>
+      <p style="color:var(--muted);font-size:14px;margin:0 0 18px">Vamos começar criando sua primeira conta (onde você guarda seu dinheiro). Depois é só registrar suas transações.</p>
+      <button class="btn primary" onclick="openAccountSheet()">🏦 Criar minha primeira conta</button>
+      <button class="btn ghost" style="margin-top:10px" onclick="openCardSheet()">💳 Adicionar um cartão</button>
+    </div>
+    <div class="card" style="background:linear-gradient(150deg,var(--accent),var(--brand-dk));color:#fff">
+      <div style="font-weight:700;margin-bottom:4px">💡 Dica</div>
+      <div style="font-size:13px;opacity:.92">Registre cada gasto assim que acontecer — o FinLife categoriza sozinho e te mostra pra onde vai seu dinheiro.</div>
+    </div>`;
+    return;
+  }
+  // ---- COLUNA A: resumo + insights + categorias ----
+  let a = `<div class="grid2" style="margin-top:0">
+    <div class="stat"><div class="t">Entradas do mês</div><div class="v pos">${fmt(inc)}</div></div>
+    <div class="stat"><div class="t">Saídas do mês</div><div class="v neg">${fmt(out)}</div></div>
+  </div>
+  <div class="stat" style="margin-top:12px"><div class="t">Resultado do mês</div>
+    <div class="v ${saldoMes>=0?'pos':'neg'}">${fmt(saldoMes)}</div></div>`;
+
+  const ins = buildInsights(ym);
+  if(ins.length){
+    a+=`<h2 class="section">💡 Insights</h2><div class="card">`;
+    ins.forEach(i=> a+=`<div class="insight"><span class="em">${i.e}</span><span class="tx">${i.t}</span></div>`);
+    a+=`</div>`;
+  }
+
+  const byCat = expenseByCat(ym);
+  a+=`<h2 class="section">Gastos por categoria</h2><div class="card">`;
+  if(byCat.total===0){ a+=`<div class="empty">Sem gastos neste mês ainda.</div>`; }
+  else {
+    byCat.rows.forEach(r=>{
+      const pct = Math.round(r.val/byCat.total*100);
+      a+=`<div>
+        <div class="catrow"><span class="nm"><span class="swatch" style="background:${CATS[r.cat].cor}"></span>${CATS[r.cat].e} ${CATS[r.cat].nome}</span>
+        <span><b>${fmt(r.val)}</b> · ${pct}%</span></div>
+        <div class="catbar"><span style="width:${pct}%;background:${CATS[r.cat].cor}"></span></div>
+      </div>`;
+    });
+  }
+  a+=`</div>`;
+
+  // ---- COLUNA B: contas + últimas transações + assistente ----
+  let b = `<h2 class="section">Minhas contas</h2><div class="chip-row">`;
+  S.accounts.forEach(ac=>{
+    b+=`<div class="acct-chip" style="background:linear-gradient(150deg,${ac.cor},${shade(ac.cor,-25)})">
+      <div class="nm">${esc(ac.nome)}</div><div class="bl">${fmt(accountBalance(ac.id))}</div>
+      <div class="tp">${tipoLabel(ac.tipo)}</div></div>`;
+  });
+  b+=`<div class="acct-chip" style="background:#eef2f0;color:var(--brand);display:flex;flex-direction:column;justify-content:center;align-items:center;cursor:pointer;min-width:70px" onclick="openAccountSheet()">
+      <div style="font-size:24px">＋</div><div style="font-size:11px">Nova conta</div></div></div>`;
+
+  b+=`<h2 class="section">Últimas transações</h2><div class="card" id="homeTx">`;
+  const last = [...S.tx].sort((x,y)=>y.date.localeCompare(x.date)).slice(0,6);
+  b+= last.length? last.map(txRow).join("") : `<div class="empty">Nada por aqui ainda.</div>`;
+  b+=`</div>`;
+
+  b+=`<div class="card" style="background:linear-gradient(150deg,var(--accent),var(--brand-dk));color:#fff;cursor:pointer" onclick="go('chat')">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:26px">🤖</span>
+      <div><div style="font-weight:700">Assistente FinLife</div>
+      <div style="font-size:12.5px;opacity:.9">Pergunte: “quanto gastei com alimentação?”</div></div>
+    </div></div>`;
+
+  document.getElementById("v-home").innerHTML = `<div class="dash"><div class="col">${a}</div><div class="col">${b}</div></div>`;
+}
+
+function txRow(t){
+  const c = CATS[t.cat]||CATS.outros;
+  const sign = t.tipo==="receita" || t.tipo==="transf-in";
+  const parc = (t.parcTotal>1)?` · ${t.parcAtual}/${t.parcTotal}`:"";
+  const rec = t.recId?` · 🔁 ${perLabel(t.recPer)}`:"";
+  const amtCls = sign?"amt-pos":"amt-neg";
+  const amt = (sign?"+ ":"- ")+fmt(t.valor).replace("-","");
+  const canEdit = !(t.tipo==="transf-in"||t.tipo==="transf-out");
+  return `<div class="list-item">
+    <div class="ic" style="background:${c.cor}22">${c.e}</div>
+    <div class="li-main">
+      <div class="li-title">${esc(t.desc||c.nome)}</div>
+      <div class="li-sub">${dateLabel(t.date)} · ${srcName(t.src)}${parc}${rec}</div>
+    </div>
+    <div class="li-amt ${amtCls}">${amt}</div>
+    ${canEdit?`<button class="del-x" onclick="openEditTx('${t.id}')" title="Editar">✏️</button>`:""}
+    <button class="del-x" onclick="delTx('${t.id}')" title="Excluir">🗑</button>
+  </div>`;
+}
+
+function renderTx(){
+  let h=`<h2 class="section">Todas as transações</h2>`;
+  h+=`<div style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto">
+    <button class="btn ghost mini flt on" data-flt="all">Tudo</button>
+    <button class="btn ghost mini flt" data-flt="receita">Receitas</button>
+    <button class="btn ghost mini flt" data-flt="despesa">Despesas</button>
+  </div><div class="card" id="txList"></div>`;
+  document.getElementById("v-tx").innerHTML=h;
+  drawTxList("all");
+  document.querySelectorAll("#v-tx .flt").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll("#v-tx .flt").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); drawTxList(b.dataset.flt);
+  });
+}
+function drawTxList(flt){
+  let list=[...S.tx].sort((a,b)=>b.date.localeCompare(a.date));
+  if(flt==="receita") list=list.filter(t=>t.tipo==="receita");
+  if(flt==="despesa") list=list.filter(t=>t.tipo==="despesa"||t.tipo==="transf-out");
+  const el=document.getElementById("txList");
+  el.innerHTML = list.length? list.map(txRow).join("") : `<div class="empty"><div class="big">🧾</div>Nenhuma transação. Toque no + para adicionar.</div>`;
+}
+
+function renderCards(){
+  const ym=curYM();
+  let h=`<h2 class="section">Meus cartões</h2>`;
+  if(!S.cards.length) h+=`<div class="empty">Nenhum cartão cadastrado.</div>`;
+  S.cards.forEach(c=>{
+    const fat=cardInvoice(c.id,ym);
+    const usoPct=Math.min(100,Math.round(fat/c.limite*100));
+    h+=`<div class="cardface" style="background:linear-gradient(150deg,${c.cor},${shade(c.cor,-30)})">
+      <div class="nm">💳 ${esc(c.nome)}</div>
+      <div class="fat">${fmt(fat)}</div>
+      <div style="font-size:11px;opacity:.9">Fatura de ${monthName(ym)}</div>
+      <div class="progress"><span style="width:${usoPct}%"></span></div>
+      <div class="meta"><span>Limite ${fmtShort(c.limite)} · usado ${usoPct}%</span><span>Fecha dia ${c.fechamento} · vence ${c.vencimento}</span></div>
+    </div>`;
+    const items=S.tx.filter(t=>t.src===c.id && (t.comp||t.date.slice(0,7))===ym).sort((a,b)=>b.date.localeCompare(a.date));
+    if(items.length){ h+=`<div class="card" style="margin-top:-4px">`+items.map(txRow).join("")+`</div>`; }
+  });
+  h+=`<button class="btn ghost" onclick="openCardSheet()">＋ Adicionar cartão</button>`;
+  document.getElementById("v-cards").innerHTML=h;
+}
+
+function recorrenciasSection(){
+  const ativas=(S.recur||[]).filter(r=>r.ativo);
+  if(!ativas.length) return "";
+  let h=`<h2 class="section">🔁 Recorrências ativas</h2><div class="card">`;
+  ativas.forEach(r=>{
+    const c=CATS[r.cat]||CATS.outros;
+    const sinal=r.tipo==="receita"?"+ ":"- ";
+    h+=`<div class="list-item">
+      <div class="ic" style="background:${c.cor}22">${c.e}</div>
+      <div class="li-main">
+        <div class="li-title">${esc(r.desc)}</div>
+        <div class="li-sub">${perLabel(r.periodicidade)} · ${srcName(r.src)}</div>
+      </div>
+      <div class="li-amt ${r.tipo==='receita'?'amt-pos':'amt-neg'}">${sinal}${fmt(r.valor).replace('-','')}</div>
+      <button class="del-x" onclick="stopRecurrence('${r.id}')" title="Parar recorrência">⏸</button>
+    </div>`;
+  });
+  h+=`</div>`;
+  return h;
+}
+function renderMore(){
+  const h=`
+  <h2 class="section">Ferramentas</h2>
+  <div class="card">
+    <div class="more-item" onclick="go('chat')"><div class="ic">🤖</div><div class="li-main"><div class="li-title">Assistente financeiro</div><div class="li-sub">Pergunte sobre seus gastos</div></div><span>›</span></div>
+    <div class="more-item" onclick="openAccountSheet()"><div class="ic">🏦</div><div class="li-main"><div class="li-title">Nova conta</div><div class="li-sub">Corrente, carteira, poupança</div></div><span>›</span></div>
+    <div class="more-item" onclick="openCardSheet()"><div class="ic">💳</div><div class="li-main"><div class="li-title">Novo cartão</div><div class="li-sub">Limite, fechamento, vencimento</div></div><span>›</span></div>
+    <div class="more-item" onclick="openNameSheet()"><div class="ic">👤</div><div class="li-main"><div class="li-title">Meu nome</div><div class="li-sub">${S.nome?esc(S.nome):"Personalizar saudação"}</div></div><span>›</span></div>
+    <div class="more-item" onclick="openSecuritySheet()" style="border:0"><div class="ic">🔒</div><div class="li-main"><div class="li-title">Segurança${encEnabled?' · <span style="color:var(--pos)">ativada</span>':''}</div><div class="li-sub">${encEnabled?"Dados protegidos por senha":"Proteger com senha e criptografia"}</div></div><span>›</span></div>
+  </div>
+  <h2 class="section">Resumo</h2>
+  <div class="grid2">
+    <div class="stat"><div class="t">Contas</div><div class="v">${S.accounts.length}</div></div>
+    <div class="stat"><div class="t">Cartões</div><div class="v">${S.cards.length}</div></div>
+    <div class="stat"><div class="t">Transações</div><div class="v">${S.tx.length}</div></div>
+    <div class="stat"><div class="t">Patrimônio</div><div class="v">${fmtShort(totalBalance())}</div></div>
+  </div>
+  ${recorrenciasSection()}
+  <h2 class="section">Dados</h2>
+  <div class="card">
+    <div class="more-item" onclick="startEmpty()"><div class="ic">✨</div><div class="li-main"><div class="li-title">Começar vazio (meus dados)</div><div class="li-sub">Apaga o exemplo e começa do zero</div></div><span>›</span></div>
+    <div class="more-item" onclick="exportData()"><div class="ic">📤</div><div class="li-main"><div class="li-title">Exportar dados (JSON)</div><div class="li-sub">Salva um backup do seu FinLife</div></div><span>›</span></div>
+    <div class="more-item" onclick="importData()"><div class="ic">📥</div><div class="li-main"><div class="li-title">Importar backup (JSON)</div><div class="li-sub">Traz os dados de outro aparelho</div></div><span>›</span></div>
+    <div class="more-item" onclick="resetData()" style="border:0"><div class="ic" style="background:#fbeae8">🔄</div><div class="li-main"><div class="li-title" style="color:var(--neg)">Recarregar exemplo</div><div class="li-sub">Volta aos dados de demonstração</div></div><span>›</span></div>
+  </div>
+  <div class="hint" style="text-align:center;margin-top:16px">FinLife — protótipo web · dados salvos apenas neste navegador</div>`;
+  document.getElementById("v-more").innerHTML=h;
+}
+
+/* ====================== INSIGHTS ====================== */
+function expenseByCat(ym){
+  const map={}; let total=0;
+  monthTx(ym).filter(t=>t.tipo==="despesa").forEach(t=>{ map[t.cat]=(map[t.cat]||0)+t.valor; total+=t.valor; });
+  const rows=Object.entries(map).map(([cat,val])=>({cat,val})).sort((a,b)=>b.val-a.val);
+  return {rows,total};
+}
+function buildInsights(ym){
+  const out=[]; const cur=expenseByCat(ym);
+  // maior categoria
+  if(cur.rows.length){ const top=cur.rows[0]; const pct=Math.round(top.val/cur.total*100);
+    out.push({e:CATS[top.cat].e,t:`Sua maior despesa em ${monthName(ym)} é <b>${CATS[top.cat].nome}</b>: ${fmt(top.val)} (${pct}% do total).`});
+  }
+  // comparacao mes anterior
+  const prev=prevYM(ym); const pe=monthExpense(prev), ce=monthExpense(ym);
+  if(pe>0){ const diff=Math.round((ce-pe)/pe*100);
+    if(Math.abs(diff)>=5) out.push({e:diff>0?"📈":"📉",t:`Seus gastos estão <b>${Math.abs(diff)}% ${diff>0?"maiores":"menores"}</b> que em ${monthName(prev)}.`});
+  }
+  // resultado
+  const res=monthIncome(ym)-ce;
+  if(res>0) out.push({e:"✅",t:`Você está no <b>positivo</b> este mês: sobrou ${fmt(res)} até agora.`});
+  else if(res<0) out.push({e:"⚠️",t:`Atenção: você gastou <b>${fmt(-res)} a mais</b> do que recebeu este mês.`});
+  // faturas
+  let totFat=0; S.cards.forEach(c=>totFat+=cardInvoice(c.id,ym));
+  if(totFat>0) out.push({e:"💳",t:`Faturas de cartão em aberto somam <b>${fmt(totFat)}</b>.`});
+  return out.slice(0,4);
+}
+
+/* ====================== SHEETS (modais) ====================== */
+const bg=document.getElementById("sheetBg"), sheet=document.getElementById("sheet");
+function openSheet(html){ sheet.innerHTML=`<div class="grabber"></div>`+html; bg.classList.add("open"); }
+function closeSheet(){ bg.classList.remove("open"); }
+bg.onclick=e=>{ if(e.target===bg) closeSheet(); };
+
+let txForm={tipo:"despesa",cat:"outros",src:null};
+function openTxSheet(){
+  if(S.accounts.length===0){ toast("Crie uma conta primeiro 🙂"); setTimeout(openAccountSheet,500); return; }
+  txForm={tipo:"despesa",cat:"outros",src:S.accounts[0]?.id||null};
+  const acctOpts=S.accounts.map(a=>`<option value="${a.id}">${esc(a.nome)}</option>`).join("");
+  const cardOpts=S.cards.map(c=>`<option value="${c.id}">💳 ${esc(c.nome)}</option>`).join("");
+  openSheet(`<h3>Nova transação</h3>
+    <div class="seg" id="segTipo">
+      <button data-t="despesa" class="on">Despesa</button>
+      <button data-t="receita">Receita</button>
+      <button data-t="transf">Transferência</button>
+    </div>
+    <label class="fld">Valor</label>
+    <input id="txVal" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
+    <label class="fld">Descrição</label>
+    <input id="txDesc" placeholder="Ex: Supermercado, Uber, Salário...">
+    <div class="hint" id="catHint"></div>
+    <div id="wrapCat">
+      <label class="fld">Categoria <span style="color:var(--brand)">(sugerida automaticamente)</span></label>
+      <div class="catgrid" id="catGrid"></div>
+    </div>
+    <div id="wrapSrc">
+      <label class="fld">Conta / Cartão</label>
+      <select id="txSrc"><optgroup label="Contas">${acctOpts}</optgroup>${cardOpts?`<optgroup label="Cartões">${cardOpts}</optgroup>`:""}</select>
+    </div>
+    <div id="wrapTransf" style="display:none">
+      <div class="row2">
+        <div><label class="fld">De</label><select id="txFrom">${acctOpts}</select></div>
+        <div><label class="fld">Para</label><select id="txTo">${acctOpts}</select></div>
+      </div>
+    </div>
+    <div id="wrapParc" style="display:none">
+      <label class="fld">Parcelas</label>
+      <select id="txParc">${Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1}x</option>`).join("")}</select>
+    </div>
+    <div id="wrapRep">
+      <label class="fld">🔁 Repetir</label>
+      <select id="txRep">
+        <option value="nao">Não repetir (única vez)</option>
+        <option value="mensal">Todo mês</option>
+        <option value="semanal">Toda semana</option>
+        <option value="anual">Todo ano</option>
+      </select>
+      <div class="hint" id="repHint"></div>
+    </div>
+    <label class="fld">Data ${'<span id="dateLbl" style="color:var(--muted)"></span>'}</label>
+    <input id="txDate" type="date" value="${new Date().toISOString().slice(0,10)}">
+    <button class="btn primary" style="margin-top:18px" onclick="saveTx()">Salvar transação</button>`);
+  buildCatGrid();
+  document.querySelectorAll("#segTipo button").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll("#segTipo button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); txForm.tipo=b.dataset.t;
+    document.getElementById("wrapTransf").style.display = txForm.tipo==="transf"?"block":"none";
+    document.getElementById("wrapSrc").style.display = txForm.tipo==="transf"?"none":"block";
+    document.getElementById("wrapCat").style.display = txForm.tipo==="transf"?"none":"block";
+    document.getElementById("wrapRep").style.display = txForm.tipo==="transf"?"none":"block";
+    updateParcVisibility();
+  });
+  const descEl=document.getElementById("txDesc");
+  descEl.oninput=()=>{ const g=autoCat(descEl.value,txForm.tipo);
+    if(document.getElementById("txDesc").value.length>1){ txForm.cat=g; buildCatGrid();
+      document.getElementById("catHint").innerHTML=`✨ Categorizado como <b>${CATS[g].e} ${CATS[g].nome}</b> — toque para mudar.`; } };
+  document.getElementById("txSrc").onchange=updateParcVisibility;
+  document.getElementById("txRep").onchange=updateParcVisibility;
+  updateParcVisibility();
+}
+function updateParcVisibility(){
+  const src=document.getElementById("txSrc");
+  const rep=document.getElementById("txRep");
+  const repeating = rep && rep.value!=="nao";
+  // parcelas só em despesa no cartão E quando NÃO é recorrente
+  const showParc = txForm.tipo==="despesa" && src && isCard(src.value) && !repeating;
+  const wp=document.getElementById("wrapParc"); if(wp) wp.style.display=showParc?"block":"none";
+  const hint=document.getElementById("repHint");
+  if(hint){ hint.innerHTML = repeating
+    ? `Será lançado automaticamente ${rep.value==="mensal"?"todo mês":rep.value==="semanal"?"toda semana":"todo ano"}, a partir da data escolhida.`
+    : ""; }
+  const dl=document.getElementById("dateLbl");
+  if(dl) dl.textContent = repeating ? "(1ª ocorrência)" : "";
+}
+function buildCatGrid(){
+  const g=document.getElementById("catGrid"); if(!g)return;
+  g.innerHTML=Object.entries(CATS).map(([k,c])=>
+    `<div class="catpick ${txForm.cat===k?"on":""}" onclick="pickCat('${k}')"><span class="e">${c.e}</span>${c.nome.split(" ")[0]}</div>`).join("");
+}
+function pickCat(k){ txForm.cat=k; buildCatGrid(); }
+function saveTx(){
+  const val=parseMoney(document.getElementById("txVal").value);
+  if(!val||val<=0){ toast("Informe um valor válido"); return; }
+  const desc=document.getElementById("txDesc").value.trim();
+  const date=document.getElementById("txDate").value||new Date().toISOString().slice(0,10);
+  if(txForm.tipo==="transf"){
+    const from=document.getElementById("txFrom").value, to=document.getElementById("txTo").value;
+    if(from===to){ toast("Escolha contas diferentes"); return; }
+    S.tx.push({id:txid(),tipo:"transf-out",valor:val,desc:desc||"Transferência",cat:"outros",src:from,date,comp:date.slice(0,7),pair:to});
+    S.tx.push({id:txid(),tipo:"transf-in",valor:val,desc:desc||"Transferência",cat:"outros",src:to,date,comp:date.slice(0,7),pair:from});
+    toast("Transferência registrada ✅"); closeSheet(); renderAll(); return;
+  }
+  const src=document.getElementById("txSrc").value;
+  const cat = txForm.tipo==="receita" && txForm.cat==="outros" ? "salario" : txForm.cat;
+  const rep=(document.getElementById("txRep")||{}).value||"nao";
+
+  if(rep!=="nao"){
+    // cria uma regra de recorrência; as ocorrências são geradas automaticamente
+    const rule={id:"r"+txid(),tipo:txForm.tipo,valor:val,desc:desc||CATS[cat].nome,cat,src,
+      periodicidade:rep,startDate:date,lastRun:null,ativo:true};
+    S.recur.push(rule);
+    materializeRecurrences();
+    closeSheet(); renderAll();
+    toast(`Recorrência ${perLabel(rep)} criada 🔁`);
+    return;
+  }
+
+  if(txForm.tipo==="despesa" && isCard(src)){
+    const parc=parseInt(document.getElementById("txParc").value||"1");
+    const each=Math.round((val/parc)*100)/100;
+    const base=new Date(date);
+    for(let i=0;i<parc;i++){ const d=new Date(base); d.setMonth(d.getMonth()+i);
+      S.tx.push({id:txid(),tipo:"despesa",valor:each,desc:desc||CATS[cat].nome,cat,src,date:d.toISOString().slice(0,10),comp:d.toISOString().slice(0,7),parcAtual:i+1,parcTotal:parc}); }
+    toast(parc>1?`Compra em ${parc}x registrada ✅`:"Despesa registrada ✅");
+  } else {
+    S.tx.push({id:txid(),tipo:txForm.tipo,valor:val,desc:desc||CATS[cat].nome,cat,src,date,comp:date.slice(0,7)});
+    toast(txForm.tipo==="receita"?"Receita registrada ✅":"Despesa registrada ✅");
+  }
+  closeSheet(); renderAll();
+}
+function delTx(id){
+  const t=S.tx.find(x=>x.id===id); if(!t)return;
+  if(t.recId){
+    const all=confirm("Esta é uma transação recorrente 🔁\n\nOK = parar a recorrência e remover TODAS as ocorrências.\nCancelar = excluir apenas esta.");
+    if(all){
+      S.tx=S.tx.filter(x=>x.recId!==t.recId);
+      S.recur=(S.recur||[]).filter(r=>r.id!==t.recId);
+      renderAll(); toast("Recorrência removida"); return;
+    }
+  }
+  S.tx=S.tx.filter(x=>x.id!==id);
+  if(t.pair){ // remove par de transferencia
+    const partner=S.tx.find(x=>x.pair===t.src && x.date===t.date && x.valor===t.valor);
+    if(partner) S.tx=S.tx.filter(x=>x.id!==partner.id);
+  }
+  renderAll(); toast("Transação excluída");
+}
+function stopRecurrence(rid){
+  if(!confirm("Parar esta recorrência? As ocorrências já lançadas continuam; nenhuma nova será criada.")) return;
+  const r=(S.recur||[]).find(x=>x.id===rid); if(r) r.ativo=false;
+  renderAll(); toast("Recorrência pausada");
+}
+
+/* ---- EDITAR TRANSAÇÃO ---- */
+let editId=null;
+function openEditTx(id){
+  const t=S.tx.find(x=>x.id===id); if(!t) return;
+  if(t.tipo==="transf-in"||t.tipo==="transf-out"){ toast("Transferência: exclua e recrie 🙂"); return; }
+  editId=id;
+  txForm={tipo:t.tipo,cat:t.cat||"outros",src:t.src};
+  const acctOpts=S.accounts.map(a=>`<option value="${a.id}" ${a.id===t.src?"selected":""}>${esc(a.nome)}</option>`).join("");
+  const cardOpts=S.cards.map(c=>`<option value="${c.id}" ${c.id===t.src?"selected":""}>💳 ${esc(c.nome)}</option>`).join("");
+  const valBR=(""+t.valor).replace(".",",");
+  openSheet(`<h3>Editar transação</h3>
+    <div class="seg" id="segTipoE">
+      <button data-t="despesa" class="${t.tipo==="despesa"?"on":""}">Despesa</button>
+      <button data-t="receita" class="${t.tipo==="receita"?"on":""}">Receita</button>
+    </div>
+    <label class="fld">Valor</label>
+    <input id="etxVal" type="text" inputmode="decimal" value="${valBR}" autocomplete="off">
+    <label class="fld">Descrição</label>
+    <input id="etxDesc" value="${esc(t.desc||"")}">
+    <label class="fld">Categoria</label>
+    <div class="catgrid" id="catGridE"></div>
+    <label class="fld">Conta / Cartão</label>
+    <select id="etxSrc"><optgroup label="Contas">${acctOpts}</optgroup>${cardOpts?`<optgroup label="Cartões">${cardOpts}</optgroup>`:""}</select>
+    <label class="fld">Data</label>
+    <input id="etxDate" type="date" value="${t.date}">
+    ${t.recId?'<div class="hint">🔁 Edita apenas esta ocorrência (não muda as demais).</div>':""}
+    ${t.parcTotal>1?`<div class="hint">Parcela ${t.parcAtual}/${t.parcTotal} — edita apenas esta parcela.</div>`:""}
+    <button class="btn primary" style="margin-top:16px" onclick="saveEditTx()">Salvar alterações</button>
+    <button class="btn ghost" style="margin-top:10px" onclick="closeSheet()">Cancelar</button>`);
+  buildCatGridE();
+  document.querySelectorAll("#segTipoE button").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll("#segTipoE button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); txForm.tipo=b.dataset.t;
+  });
+}
+function buildCatGridE(){
+  const g=document.getElementById("catGridE"); if(!g)return;
+  g.innerHTML=Object.entries(CATS).map(([k,c])=>
+    `<div class="catpick ${txForm.cat===k?"on":""}" onclick="pickCatE('${k}')"><span class="e">${c.e}</span>${c.nome.split(" ")[0]}</div>`).join("");
+}
+function pickCatE(k){ txForm.cat=k; buildCatGridE(); }
+function saveEditTx(){
+  const t=S.tx.find(x=>x.id===editId); if(!t){ closeSheet(); return; }
+  const val=parseMoney(document.getElementById("etxVal").value);
+  if(!val||val<=0){ toast("Informe um valor válido"); return; }
+  t.tipo=txForm.tipo;
+  t.valor=val;
+  t.cat=txForm.cat;
+  t.desc=document.getElementById("etxDesc").value.trim()||CATS[txForm.cat].nome;
+  t.src=document.getElementById("etxSrc").value;
+  t.date=document.getElementById("etxDate").value||t.date;
+  t.comp=t.date.slice(0,7);
+  editId=null; save(); closeSheet(); renderAll(); toast("Transação atualizada ✅");
+}
+
+function openAccountSheet(){
+  openSheet(`<h3>Nova conta</h3>
+    <label class="fld">Nome</label><input id="acNome" placeholder="Ex: Nubank, Carteira...">
+    <label class="fld">Tipo</label>
+    <select id="acTipo"><option value="corrente">Conta corrente</option><option value="carteira">Carteira / Dinheiro</option><option value="poupanca">Poupança</option></select>
+    <label class="fld">Saldo atual</label><input id="acSaldo" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
+    <button class="btn primary" style="margin-top:18px" onclick="saveAccount()">Criar conta</button>`);
+}
+function saveAccount(){
+  const nome=document.getElementById("acNome").value.trim(); if(!nome){toast("Dê um nome à conta");return;}
+  const tipo=document.getElementById("acTipo").value;
+  const saldo=parseMoney(document.getElementById("acSaldo").value)||0;
+  S.accounts.push({id:"a"+txid(),nome,tipo,saldoInicial:saldo,cor:ACCENT_COLORS[S.accounts.length%ACCENT_COLORS.length]});
+  closeSheet(); renderAll(); toast("Conta criada ✅");
+}
+function openCardSheet(){
+  openSheet(`<h3>Novo cartão</h3>
+    <label class="fld">Nome / Bandeira</label><input id="cdNome" placeholder="Ex: Nubank, Itaú Visa...">
+    <label class="fld">Limite</label><input id="cdLim" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
+    <div class="row2">
+      <div><label class="fld">Dia de fechamento</label><input id="cdFech" type="number" min="1" max="31" placeholder="28"></div>
+      <div><label class="fld">Dia de vencimento</label><input id="cdVenc" type="number" min="1" max="31" placeholder="5"></div>
+    </div>
+    <button class="btn primary" style="margin-top:18px" onclick="saveCard()">Criar cartão</button>`);
+}
+function saveCard(){
+  const nome=document.getElementById("cdNome").value.trim(); if(!nome){toast("Dê um nome ao cartão");return;}
+  const limite=parseMoney(document.getElementById("cdLim").value)||0;
+  const fech=parseInt(document.getElementById("cdFech").value)||28;
+  const venc=parseInt(document.getElementById("cdVenc").value)||5;
+  S.cards.push({id:"c"+txid(),nome,limite,fechamento:fech,vencimento:venc,cor:ACCENT_COLORS[(S.cards.length+2)%ACCENT_COLORS.length]});
+  closeSheet(); renderAll(); toast("Cartão criado ✅");
+}
+function openNameSheet(){
+  openSheet(`<h3>Como quer ser chamada?</h3>
+    <label class="fld">Seu nome</label><input id="nmInput" value="${esc(S.nome)}" placeholder="Ex: Hellen">
+    <button class="btn primary" style="margin-top:18px" onclick="saveName()">Salvar</button>`);
+}
+function saveName(){ S.nome=document.getElementById("nmInput").value.trim(); closeSheet(); renderAll(); toast("Prontinho ✅"); }
+
+/* ---- SEGURANÇA (senha + criptografia) ---- */
+function openSecuritySheet(){
+  if(!SUB){
+    openSheet(`<h3>🔒 Segurança</h3>
+      <p style="color:var(--muted);font-size:14px">A proteção por senha usa criptografia, que só funciona em conexão <b>segura (HTTPS)</b> ou no <b>localhost</b>.<br><br>No acesso pelo IP da rede (http://192.168…) o navegador bloqueia esse recurso. Quando você publicar o FinLife em HTTPS, a opção fica disponível.</p>
+      <button class="btn ghost" onclick="closeSheet()">Entendi</button>`);
+    return;
+  }
+  if(encEnabled){
+    openSheet(`<h3>🔒 Proteção ativada</h3>
+      <p style="color:var(--muted);font-size:14px">Seus dados estão <b>criptografados</b> neste navegador. Ao abrir o FinLife, a senha é pedida.</p>
+      <button class="btn ghost" onclick="openChangePass()">Trocar senha</button>
+      <button class="btn danger" style="margin-top:10px" onclick="disableSecurity()">Desativar proteção</button>
+      <button class="btn ghost" style="margin-top:10px" onclick="closeSheet()">Fechar</button>`);
+    return;
+  }
+  openSheet(`<h3>🔒 Ativar senha</h3>
+    <p style="color:var(--muted);font-size:13px;line-height:1.5">Cria uma senha que <b>criptografa</b> seus dados neste navegador (AES-256). Sem a senha, ninguém consegue ler — <b>nem você</b>.<br><br>⚠️ Não há como recuperar se esquecer. Faça um backup antes em <b>Exportar dados</b>.</p>
+    <label class="fld">Nova senha</label><input id="secP1" type="password" autocomplete="new-password" placeholder="mínimo 4 caracteres">
+    <label class="fld">Repita a senha</label><input id="secP2" type="password" autocomplete="new-password">
+    <button class="btn primary" style="margin-top:16px" onclick="enableSecurity()">Ativar proteção</button>
+    <button class="btn ghost" style="margin-top:10px" onclick="closeSheet()">Cancelar</button>`);
+}
+function openChangePass(){
+  openSheet(`<h3>Trocar senha</h3>
+    <label class="fld">Nova senha</label><input id="secP1" type="password" autocomplete="new-password" placeholder="mínimo 4 caracteres">
+    <label class="fld">Repita a senha</label><input id="secP2" type="password" autocomplete="new-password">
+    <button class="btn primary" style="margin-top:16px" onclick="enableSecurity()">Salvar nova senha</button>
+    <button class="btn ghost" style="margin-top:10px" onclick="closeSheet()">Cancelar</button>`);
+}
+async function enableSecurity(){
+  const p1=document.getElementById("secP1").value, p2=document.getElementById("secP2").value;
+  if(!p1||p1.length<4){ toast("Use ao menos 4 caracteres"); return; }
+  if(p1!==p2){ toast("As senhas não conferem"); return; }
+  try{
+    encSalt=crypto.getRandomValues(new Uint8Array(16));
+    cryptoKey=await deriveKey(p1, encSalt);
+    encEnabled=true; save();
+    closeSheet(); renderAll(); toast("Proteção ativada 🔒");
+  }catch(e){ toast("Não foi possível ativar 😕"); }
+}
+async function disableSecurity(){
+  if(!confirm("Desativar a proteção? Seus dados voltarão a ficar SEM criptografia neste navegador.")) return;
+  encEnabled=false; cryptoKey=null; encSalt=null;
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){}
+  closeSheet(); renderAll(); toast("Proteção desativada");
+}
+
+/* ====================== ASSISTENTE ====================== */
+let chatHist=[];
+function renderChat(){
+  const sug=["Quanto gastei este mês?","Gastos com alimentação","Qual meu saldo total?","Maior gasto do mês","Fatura dos cartões"];
+  let h=`<h2 class="section">🤖 Assistente FinLife</h2>
+    <div class="chatlog" id="chatlog"></div>
+    <div class="suggest">${sug.map(s=>`<button onclick="ask('${s}')">${s}</button>`).join("")}</div>
+    <form class="chatform" onsubmit="event.preventDefault();askInput()">
+      <input id="chatInput" placeholder="Pergunte sobre suas finanças...">
+      <button type="submit">➤</button>
+    </form>`;
+  document.getElementById("v-chat").innerHTML=h;
+  drawChat();
+  if(chatHist.length===0){ botSay("Oi! Sou seu assistente. Posso responder sobre seus gastos, saldo e faturas. Experimente uma das sugestões abaixo 👇"); }
+}
+function drawChat(){
+  const el=document.getElementById("chatlog"); if(!el)return;
+  el.innerHTML=chatHist.map(m=>`<div class="bubble ${m.who}">${m.text}</div>`).join("");
+  el.scrollTop=el.scrollHeight;
+}
+function botSay(t){ chatHist.push({who:"bot",text:t}); drawChat(); }
+function userSay(t){ chatHist.push({who:"user",text:esc(t)}); drawChat(); }
+function askInput(){ const i=document.getElementById("chatInput"); if(i.value.trim()){ ask(i.value.trim()); i.value=""; } }
+function ask(q){ userSay(q); setTimeout(()=>botSay(answer(q)),250); }
+function answer(qRaw){
+  const q=qRaw.toLowerCase(); const ym=curYM();
+  // categoria específica
+  for(const k in CATS){
+    if(q.includes(k) || q.includes(CATS[k].nome.toLowerCase().split(" ")[0])){
+      if(CATS[k].receita) continue;
+      const v=monthTx(ym).filter(t=>t.tipo==="despesa"&&t.cat===k).reduce((s,t)=>s+t.valor,0);
+      const tot=monthExpense(ym); const pct=tot?Math.round(v/tot*100):0;
+      return v>0? `Em ${monthName(ym)} você gastou <b>${fmt(v)}</b> com ${CATS[k].e} ${CATS[k].nome} — ${pct}% das suas despesas do mês.`
+                : `Não encontrei gastos com ${CATS[k].nome} em ${monthName(ym)}.`;
+    }
+  }
+  if((q.includes("saldo")||q.includes("tenho")||q.includes("patrim"))){
+    let d=`Seu saldo consolidado é <b>${fmt(totalBalance())}</b>.<br>`;
+    d+=S.accounts.map(a=>`• ${esc(a.nome)}: ${fmt(accountBalance(a.id))}`).join("<br>");
+    return d;
+  }
+  if(q.includes("fatura")||q.includes("cart")){
+    if(!S.cards.length) return "Você ainda não cadastrou cartões.";
+    let tot=0; const lines=S.cards.map(c=>{const f=cardInvoice(c.id,ym);tot+=f;return `• ${esc(c.nome)}: ${fmt(f)} (vence dia ${c.vencimento})`;});
+    return `Faturas de ${monthName(ym)}:<br>${lines.join("<br>")}<br><b>Total: ${fmt(tot)}</b>`;
+  }
+  if(q.includes("maior")){
+    const bc=expenseByCat(ym); if(!bc.rows.length) return "Sem despesas registradas neste mês.";
+    const top=bc.rows[0]; return `Seu maior gasto em ${monthName(ym)} é <b>${CATS[top.cat].nome}</b>: ${fmt(top.val)}.`;
+  }
+  if(q.includes("receb")||q.includes("entrada")||q.includes("renda")||q.includes("ganhei")){
+    return `Você recebeu <b>${fmt(monthIncome(ym))}</b> em ${monthName(ym)}.`;
+  }
+  if(q.includes("sobr")||q.includes("result")||q.includes("economi")){
+    const r=monthIncome(ym)-monthExpense(ym);
+    return r>=0?`Este mês sobrou <b>${fmt(r)}</b> (receitas menos despesas). 👏`:`Este mês você está negativo em <b>${fmt(-r)}</b>. ⚠️`;
+  }
+  if(q.includes("gast")||q.includes("despes")||q.includes("quanto")){
+    return `Em ${monthName(ym)} suas despesas somam <b>${fmt(monthExpense(ym))}</b> e receitas <b>${fmt(monthIncome(ym))}</b>.`;
+  }
+  if(q.includes("oi")||q.includes("ola")||q.includes("olá")) return "Oi! 😊 Pergunte sobre seus gastos, saldo ou faturas.";
+  return "Posso ajudar com: saldo, gastos do mês, gastos por categoria (ex: “alimentação”), faturas de cartão e maior despesa. Tente reformular a pergunta 🙂";
+}
+
+/* ====================== UTIL VISUAL ====================== */
+function tipoLabel(t){ return {corrente:"Conta corrente",carteira:"Carteira",poupanca:"Poupança"}[t]||t; }
+function dateLabel(iso){ const [y,m,d]=iso.split("-"); const now=new Date().toISOString().slice(0,10);
+  if(iso===now) return "Hoje"; const dd=new Date(); dd.setDate(dd.getDate()-1);
+  if(iso===dd.toISOString().slice(0,10)) return "Ontem"; return `${d}/${m}`; }
+function monthName(ym){ const [y,m]=ym.split("-"); return ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"][+m-1]+"/"+y.slice(2); }
+function prevYM(ym){ const [y,m]=ym.split("-").map(Number); const d=new Date(y,m-2,1); return d.toISOString().slice(0,7); }
+function shade(hex,pct){ // escurece/clareia
+  const n=parseInt(hex.slice(1),16); let r=(n>>16)+pct*2.55, g=((n>>8)&255)+pct*2.55, b=(n&255)+pct*2.55;
+  r=Math.max(0,Math.min(255,r|0));g=Math.max(0,Math.min(255,g|0));b=Math.max(0,Math.min(255,b|0));
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1900); }
+
+/* ====================== NAVEGAÇÃO ====================== */
+function go(tab){
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("v-"+tab).classList.add("active");
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===tab));
+  if(tab==="chat") renderChat();
+  document.querySelector("main").scrollTop=0;
+}
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>go(t.dataset.tab));
+document.getElementById("fab").onclick=openTxSheet;
+document.getElementById("eyeBtn").onclick=()=>{ hideValues=!hideValues; document.getElementById("eyeBtn").textContent=hideValues?"🙈":"👁"; renderAll(); };
+
+/* ====================== DADOS ====================== */
+function exportData(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download="finlife-backup.json"; a.click(); URL.revokeObjectURL(url);
+  toast("Backup exportado 📤");
+}
+function importData(){
+  const inp=document.createElement("input");
+  inp.type="file"; inp.accept="application/json,.json";
+  inp.onchange=()=>{
+    const file=inp.files&&inp.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      let data;
+      try{ data=JSON.parse(reader.result); }
+      catch(e){ toast("Não consegui ler o arquivo ❌"); return; }
+      if(!data || !Array.isArray(data.accounts) || !Array.isArray(data.tx)){
+        toast("Arquivo de backup inválido ❌"); return;
+      }
+      const resumo=`${data.accounts.length} conta(s), ${(data.cards||[]).length} cartão(ões), ${data.tx.length} transação(ões)`;
+      if(!confirm(`Importar este backup?\n(${resumo})\n\nISSO SUBSTITUI os dados atuais deste aparelho.`)) return;
+      S={ nome:data.nome||"", accounts:data.accounts||[], cards:data.cards||[], tx:data.tx||[], recur:data.recur||[] };
+      save(); materializeRecurrences(); renderAll(); go("home");
+      toast("Backup importado ✅");
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+}
+function resetData(){ if(confirm("Isso apaga tudo e recarrega os dados de exemplo. Continuar?")){ S=seed(); save(); renderAll(); go("home"); toast("Exemplo recarregado"); } }
+function startEmpty(){
+  if(!confirm("Começar do zero com seus próprios dados? Os dados de exemplo serão apagados.")) return;
+  const nome=S.nome||"";
+  S={nome,accounts:[],cards:[],tx:[],recur:[]};
+  save(); renderAll(); go("home");
+  toast("Tudo limpo ✨ Vamos criar sua 1ª conta");
+  setTimeout(openAccountSheet,600);
+}
+
+/* ====================== START ====================== */
+init();
+</script>
+</body>
+</html>
