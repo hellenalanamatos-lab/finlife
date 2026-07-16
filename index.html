@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src https://nsgxldkaerxcpokidkzt.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <meta name="referrer" content="no-referrer">
 <title>FinLife — Seu dinheiro, organizado</title>
 <style>
@@ -249,7 +249,10 @@
         <div class="brand"><span class="dot"></span>FinLife</div>
         <div class="hello" id="hello">Olá! 👋</div>
       </div>
-      <button class="eye" id="eyeBtn" title="Mostrar/ocultar valores">👁</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="syncDot" style="font-size:11px;color:#fff;opacity:0;transition:opacity .3s;white-space:nowrap"></span>
+        <button class="eye" id="eyeBtn" title="Mostrar/ocultar valores">👁</button>
+      </div>
     </div>
     <div class="balance-card">
       <div class="bcleft">
@@ -342,25 +345,102 @@ async function decryptEnvelope(env, key){
   const pt = await SUB.decrypt({name:"AES-GCM", iv:b64ToU8(env.iv)}, key, b64ToU8(env.ct));
   return JSON.parse(new TextDecoder().decode(pt));
 }
+function cacheLocal(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
 function save(){
-  if(encEnabled && cryptoKey && SUB){
+  if(session){                       // modo nuvem: cache local (texto) + envia
+    cacheLocal(); schedulePush(); return;
+  }
+  if(encEnabled && cryptoKey && SUB){ // modo local com criptografia
     encryptEnvelope().then(env=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(env)); }catch(e){} }).catch(()=>{});
   } else {
-    try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){}
+    cacheLocal();
   }
 }
+
+/* ====================== NUVEM (Supabase) ====================== */
+const SUPA_URL = "https://nsgxldkaerxcpokidkzt.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zZ3hsZGthZXJ4Y3Bva2lka3p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMTIxODEsImV4cCI6MjA5OTc4ODE4MX0.h96jYW_NUVbtTJcXaiKv3FH589cbcvbSWglsKYnSAp4";
+const SESS_KEY = "finlife_session";
+let session = null;      // {access_token, refresh_token, uid, email, exp}
+let pushTimer = null;
+
+async function supa(path, opts={}){
+  opts.headers = Object.assign({ apikey:SUPA_KEY, "Content-Type":"application/json" }, opts.headers||{});
+  return fetch(SUPA_URL+path, opts);
+}
+async function authSignup(email, pass){
+  const r=await supa("/auth/v1/signup",{method:"POST",body:JSON.stringify({email,password:pass})});
+  const j=await r.json(); if(!r.ok) throw new Error(j.msg||j.error_description||j.error||"Falha no cadastro"); return j;
+}
+async function authLogin(email, pass){
+  const r=await supa("/auth/v1/token?grant_type=password",{method:"POST",body:JSON.stringify({email,password:pass})});
+  const j=await r.json(); if(!r.ok) throw new Error(j.msg||j.error_description||j.error||"E-mail ou senha inválidos"); return j;
+}
+function setSession(j){
+  session={ access_token:j.access_token, refresh_token:j.refresh_token,
+    uid:(j.user&&j.user.id)||(session&&session.uid), email:(j.user&&j.user.email)||(session&&session.email),
+    exp:Date.now()+((j.expires_in||3600)*1000) };
+  try{ localStorage.setItem(SESS_KEY, JSON.stringify(session)); }catch(e){}
+}
+function clearSession(){ session=null; try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
+async function ensureSession(){
+  if(!session) return false;
+  if(Date.now() < session.exp-60000) return true;
+  try{
+    const r=await supa("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:JSON.stringify({refresh_token:session.refresh_token})});
+    const j=await r.json(); if(!r.ok) throw 0;
+    j.user={id:session.uid,email:session.email}; setSession(j); return true;
+  }catch(e){ return false; }
+}
+async function cloudPull(){
+  if(!await ensureSession()) return null;
+  try{
+    const r=await supa(`/rest/v1/vaults?user_id=eq.${session.uid}&select=data,updated_at`,{headers:{Authorization:"Bearer "+session.access_token}});
+    if(!r.ok) return null;
+    const rows=await r.json();
+    if(rows&&rows.length&&rows[0].data){ return {data:JSON.parse(rows[0].data), updated_at:rows[0].updated_at}; }
+    return {data:null};
+  }catch(e){ return null; }
+}
+async function cloudPush(){
+  if(!await ensureSession()) return false;
+  try{
+    const body=JSON.stringify({user_id:session.uid, data:JSON.stringify(S), updated_at:new Date().toISOString()});
+    const r=await supa(`/rest/v1/vaults?on_conflict=user_id`,{method:"POST",
+      headers:{Authorization:"Bearer "+session.access_token, Prefer:"resolution=merge-duplicates,return=minimal"}, body});
+    return r.ok;
+  }catch(e){ return false; }
+}
+function schedulePush(){ clearTimeout(pushTimer); pushTimer=setTimeout(()=>{ cloudPush().then(ok=>{ syncStatus(ok?"ok":"err"); }); }, 700); }
+function syncStatus(state){
+  const el=document.getElementById("syncDot"); if(!el) return;
+  el.textContent = state==="ok"?"☁️ sincronizado" : state==="sync"?"↻ sincronizando…" : "⚠️ offline";
+  el.style.opacity="1"; clearTimeout(syncStatus._t); syncStatus._t=setTimeout(()=>{ el.style.opacity="0"; },2500);
+}
+
 function afterUnlock(){ materializeRecurrences(); renderAll(); }
+function loadLocalCache(){
+  try{ const raw=localStorage.getItem(LS_KEY); if(raw){ const p=JSON.parse(raw); if(p && !p.__enc){ if(!p.recur)p.recur=[]; return p; } } }catch(e){}
+  return emptyState();
+}
 async function init(){
+  // tenta restaurar sessão da nuvem
+  try{ const raw=localStorage.getItem(SESS_KEY); if(raw) session=JSON.parse(raw); }catch(e){}
+  if(session){
+    S=loadLocalCache(); afterUnlock();          // mostra o cache local já (rápido/offline)
+    syncStatus("sync");
+    const remote=await cloudPull();
+    if(remote && remote.data){ S=remote.data; if(!S.recur)S.recur=[]; cacheLocal(); renderAll(); syncStatus("ok"); }
+    else if(remote && remote.data===null){ await cloudPush(); syncStatus("ok"); } // nuvem vazia: sobe o local
+    else { syncStatus("err"); }                  // offline: segue com cache
+    return;
+  }
+  // modo local (sem nuvem) — com possível cadeado de criptografia
   let raw=null; try{ raw=localStorage.getItem(LS_KEY); }catch(e){}
   if(!raw){ S=emptyState(); afterUnlock(); return; }
   let parsed; try{ parsed=JSON.parse(raw); }catch(e){ S=emptyState(); afterUnlock(); return; }
-  if(parsed && parsed.__enc){
-    encEnabled=true; encSalt=b64ToU8(parsed.salt);
-    showLock(parsed);
-  } else {
-    if(!parsed.recur) parsed.recur=[];
-    S=parsed; encEnabled=false; afterUnlock();
-  }
+  if(parsed && parsed.__enc){ encEnabled=true; encSalt=b64ToU8(parsed.salt); showLock(parsed); }
+  else { if(!parsed.recur) parsed.recur=[]; S=parsed; encEnabled=false; afterUnlock(); }
 }
 function showLock(env){
   const ov=document.getElementById("lockScreen"); ov.style.display="flex";
@@ -650,6 +730,7 @@ function renderMore(){
   const h=`
   <h2 class="section">Ferramentas</h2>
   <div class="card">
+    <div class="more-item" onclick="openCloudSheet()"><div class="ic">☁️</div><div class="li-main"><div class="li-title">Sincronização${session?' · <span style="color:var(--pos)">ativa</span>':''}</div><div class="li-sub">${session?esc(session.email||"Conectada"):"Sincronizar entre PC e celular"}</div></div><span>›</span></div>
     <div class="more-item" onclick="go('chat')"><div class="ic">🤖</div><div class="li-main"><div class="li-title">Assistente financeiro</div><div class="li-sub">Pergunte sobre seus gastos</div></div><span>›</span></div>
     <div class="more-item" onclick="openAccountSheet()"><div class="ic">🏦</div><div class="li-main"><div class="li-title">Nova conta</div><div class="li-sub">Corrente, carteira, poupança</div></div><span>›</span></div>
     <div class="more-item" onclick="openCardSheet()"><div class="ic">💳</div><div class="li-main"><div class="li-title">Novo cartão</div><div class="li-sub">Limite, fechamento, vencimento</div></div><span>›</span></div>
@@ -1001,6 +1082,74 @@ async function disableSecurity(){
   closeSheet(); renderAll(); toast("Proteção desativada");
 }
 
+/* ---- CONTA NA NUVEM (sincronização entre aparelhos) ---- */
+function openCloudSheet(){
+  if(session){
+    openSheet(`<h3>☁️ Conta na nuvem</h3>
+      <p style="color:var(--muted);font-size:14px">Conectada como <b>${esc(session.email||"")}</b>.<br>Seus dados sincronizam automaticamente entre os aparelhos com esta conta.</p>
+      <button class="btn ghost" onclick="syncNow()">↻ Sincronizar agora</button>
+      <button class="btn danger" style="margin-top:10px" onclick="doCloudLogout()">Sair desta conta (neste aparelho)</button>
+      <button class="btn ghost" style="margin-top:10px" onclick="closeSheet()">Fechar</button>`);
+    return;
+  }
+  openSheet(`<h3>☁️ Sincronizar entre aparelhos</h3>
+    <p style="color:var(--muted);font-size:13px;line-height:1.5">Crie uma conta (ou entre) com <b>e-mail e senha</b>. Use a <b>mesma conta</b> no PC e no celular para os dados ficarem iguais e atualizarem sozinhos.</p>
+    <label class="fld">E-mail</label><input id="cloudEmail" type="email" autocomplete="email" placeholder="voce@email.com">
+    <label class="fld">Senha</label><input id="cloudPass" type="password" autocomplete="current-password" placeholder="mínimo 6 caracteres">
+    <button class="btn primary" style="margin-top:16px" onclick="doCloudLogin()">Entrar</button>
+    <button class="btn ghost" style="margin-top:10px" onclick="doCloudSignup()">Criar conta nova</button>
+    <div class="hint" style="margin-top:12px">🔒 A conexão é segura (HTTPS) e cada conta só acessa os próprios dados. Faça um backup (Exportar) antes da 1ª sincronização.</div>`);
+}
+function cloudInputs(){ return { email:(document.getElementById("cloudEmail").value||"").trim(), pass:document.getElementById("cloudPass").value||"" }; }
+async function doCloudSignup(){
+  const {email,pass}=cloudInputs();
+  if(!email||pass.length<6){ toast("E-mail válido e senha de 6+ caracteres"); return; }
+  toast("Criando conta…");
+  try{
+    const j=await authSignup(email,pass);
+    if(j.access_token){ setSession(j); await afterCloudConnect(true); toast("Conta criada e conectada ☁️"); }
+    else { toast("Conta criada! Confirme o e-mail e depois entre."); }
+  }catch(e){ toast(e.message||"Não foi possível criar"); }
+}
+async function doCloudLogin(){
+  const {email,pass}=cloudInputs();
+  if(!email||!pass){ toast("Preencha e-mail e senha"); return; }
+  toast("Entrando…");
+  try{
+    const j=await authLogin(email,pass);
+    setSession(j); await afterCloudConnect(false); toast("Conectada à nuvem ☁️");
+  }catch(e){ toast(e.message||"E-mail ou senha inválidos"); }
+}
+async function afterCloudConnect(isNew){
+  // ao conectar, desliga o cadeado local (a conta passa a proteger)
+  encEnabled=false; cryptoKey=null; encSalt=null;
+  const remote=await cloudPull();
+  if(remote && remote.data){
+    // já existe dado na nuvem: pergunta se sobrescreve o local
+    if((S.accounts.length||S.tx.length) && confirm("Já existem dados nesta conta na nuvem.\n\nOK = usar os dados DA NUVEM (recomendado).\nCancelar = enviar os dados DESTE aparelho para a nuvem.")){
+      S=remote.data; if(!S.recur)S.recur=[]; cacheLocal();
+    } else if(!(S.accounts.length||S.tx.length)){
+      S=remote.data; if(!S.recur)S.recur=[]; cacheLocal();
+    } else {
+      await cloudPush();
+    }
+  } else {
+    await cloudPush(); // nuvem vazia: sobe o que tem
+  }
+  closeSheet(); renderAll(); syncStatus("ok");
+}
+async function doCloudLogout(){
+  if(!confirm("Sair da conta neste aparelho? Os dados continuam salvos na nuvem; este aparelho volta ao modo local.")) return;
+  clearSession(); closeSheet(); renderAll(); toast("Desconectada da nuvem");
+}
+async function syncNow(){
+  syncStatus("sync");
+  const remote=await cloudPull();
+  if(remote && remote.data){ S=remote.data; if(!S.recur)S.recur=[]; cacheLocal(); renderAll(); syncStatus("ok"); toast("Sincronizado ☁️"); }
+  else if(remote && remote.data===null){ await cloudPush(); syncStatus("ok"); toast("Enviado para a nuvem ☁️"); }
+  else { syncStatus("err"); toast("Sem conexão agora"); }
+}
+
 /* ====================== ASSISTENTE ====================== */
 let chatHist=[];
 function renderChat(){
@@ -1132,6 +1281,18 @@ function startEmpty(){
 }
 
 /* ====================== START ====================== */
+// sincroniza ao voltar o foco pro app (ex: reabrir a aba/celular)
+let focusBusy=false;
+window.addEventListener("focus", async ()=>{
+  if(!session || focusBusy) return;
+  focusBusy=true;
+  try{
+    const remote=await cloudPull();
+    if(remote && remote.data && JSON.stringify(remote.data)!==JSON.stringify(S)){
+      S=remote.data; if(!S.recur)S.recur=[]; cacheLocal(); renderAll(); syncStatus("ok");
+    }
+  }finally{ focusBusy=false; }
+});
 init();
 </script>
 </body>
