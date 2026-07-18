@@ -430,9 +430,10 @@ async function init(){
     S=loadLocalCache(); afterUnlock();          // mostra o cache local já (rápido/offline)
     syncStatus("sync");
     const remote=await cloudPull();
-    if(remote && remote.data){ S=remote.data; if(!S.recur)S.recur=[]; cacheLocal(); renderAll(); syncStatus("ok"); }
-    else if(remote && remote.data===null){ await cloudPush(); syncStatus("ok"); } // nuvem vazia: sobe o local
-    else { syncStatus("err"); }                  // offline: segue com cache
+    if(remote===null){ syncStatus("err"); }                                   // offline: segue com cache
+    else if(remote.data && !isEmptyState(remote.data)){ S=remote.data; if(!S.recur)S.recur=[]; cacheLocal(); renderAll(); syncStatus("ok"); }
+    else if(!isEmptyState(S)){ await cloudPush(); syncStatus("ok"); }          // nuvem vazia mas tenho dados -> sobe (não apaga)
+    else { syncStatus("ok"); }
     return;
   }
   // modo local (sem nuvem) — com possível cadeado de criptografia
@@ -691,7 +692,7 @@ function renderCards(){
   if(!S.cards.length) h+=`<div class="empty">Nenhum cartão cadastrado.</div>`;
   S.cards.forEach(c=>{
     const fat=cardInvoice(c.id,ym);
-    const usoPct=Math.min(100,Math.round(fat/c.limite*100));
+    const usoPct=c.limite>0?Math.min(100,Math.round(fat/c.limite*100)):0;
     h+=`<div class="cardface" style="background:linear-gradient(150deg,${c.cor},${shade(c.cor,-30)})">
       <div class="nm">💳 ${esc(c.nome)}</div>
       <div class="fat">${fmt(fat)}</div>
@@ -1120,21 +1121,26 @@ async function doCloudLogin(){
     setSession(j); await afterCloudConnect(false); toast("Conectada à nuvem ☁️");
   }catch(e){ toast(e.message||"E-mail ou senha inválidos"); }
 }
+function isEmptyState(x){ return !x || (((x.accounts||[]).length===0) && ((x.cards||[]).length===0) && ((x.tx||[]).length===0)); }
 async function afterCloudConnect(isNew){
   // ao conectar, desliga o cadeado local (a conta passa a proteger)
   encEnabled=false; cryptoKey=null; encSalt=null;
   const remote=await cloudPull();
-  if(remote && remote.data){
-    // já existe dado na nuvem: pergunta se sobrescreve o local
-    if((S.accounts.length||S.tx.length) && confirm("Já existem dados nesta conta na nuvem.\n\nOK = usar os dados DA NUVEM (recomendado).\nCancelar = enviar os dados DESTE aparelho para a nuvem.")){
-      S=remote.data; if(!S.recur)S.recur=[]; cacheLocal();
-    } else if(!(S.accounts.length||S.tx.length)){
+  const remoteHasData = remote && remote.data && !isEmptyState(remote.data);
+  const localHasData = !isEmptyState(S);
+  if(remoteHasData && localHasData){
+    // conflito real: os dois lados têm dados -> pergunta
+    if(confirm("Já existem dados NA NUVEM e também NESTE APARELHO.\n\nOK = usar os dados DA NUVEM.\nCancelar = enviar os dados DESTE APARELHO para a nuvem.")){
       S=remote.data; if(!S.recur)S.recur=[]; cacheLocal();
     } else {
       await cloudPush();
     }
+  } else if(remoteHasData){
+    // só a nuvem tem dados -> baixa
+    S=remote.data; if(!S.recur)S.recur=[]; cacheLocal();
   } else {
-    await cloudPush(); // nuvem vazia: sobe o que tem
+    // nuvem vazia -> sobe o que tem neste aparelho (não apaga nada)
+    await cloudPush();
   }
   closeSheet(); renderAll(); syncStatus("ok");
 }
@@ -1145,9 +1151,10 @@ async function doCloudLogout(){
 async function syncNow(){
   syncStatus("sync");
   const remote=await cloudPull();
-  if(remote && remote.data){ S=remote.data; if(!S.recur)S.recur=[]; cacheLocal(); renderAll(); syncStatus("ok"); toast("Sincronizado ☁️"); }
-  else if(remote && remote.data===null){ await cloudPush(); syncStatus("ok"); toast("Enviado para a nuvem ☁️"); }
-  else { syncStatus("err"); toast("Sem conexão agora"); }
+  if(remote===null){ syncStatus("err"); toast("Sem conexão agora"); }
+  else if(remote.data && !isEmptyState(remote.data)){ S=remote.data; if(!S.recur)S.recur=[]; cacheLocal(); renderAll(); syncStatus("ok"); toast("Sincronizado ☁️"); }
+  else if(!isEmptyState(S)){ await cloudPush(); syncStatus("ok"); toast("Enviado para a nuvem ☁️"); }
+  else { syncStatus("ok"); toast("Nada para sincronizar ainda"); }
 }
 
 /* ====================== ASSISTENTE ====================== */
@@ -1288,8 +1295,10 @@ window.addEventListener("focus", async ()=>{
   focusBusy=true;
   try{
     const remote=await cloudPull();
-    if(remote && remote.data && JSON.stringify(remote.data)!==JSON.stringify(S)){
+    if(remote && remote.data && !isEmptyState(remote.data) && JSON.stringify(remote.data)!==JSON.stringify(S)){
       S=remote.data; if(!S.recur)S.recur=[]; cacheLocal(); renderAll(); syncStatus("ok");
+    } else if(remote && isEmptyState(remote.data) && !isEmptyState(S)){
+      await cloudPush(); syncStatus("ok");   // nuvem vazia mas tenho dados -> sobe
     }
   }finally{ focusBusy=false; }
 });
